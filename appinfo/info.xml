@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<info>
+	<id>files_iptctagging</id>
+	<name>Files IPTC tag extractor</name>
+	<description>An app for Nextcloud that automatically reads IPTC tags from files and applies them as collaborative tags.</description>
+	<licence>AGPL</licence>
+	<author>Joas Schilling</author>
+	<version>1.0.0</version>
+	<namespace>FilesIPTCTagging</namespace>
+
+	<category>other</category>
+	<website>https://github.com/nickv-nextcloud/files_iptctagging</website>
+	<bugs>https://github.com/nickv-nextcloud/files_iptctagging/issues</bugs>
+	<repository type="git">https://github.com/nickv-nextcloud/files_iptctagging.git</repository>
+
+	<types>
+		<filesystem/>
+	</types>
+
+	<dependencies>
+		<owncloud min-version="9.2" max-version="9.2" />
+	</dependencies>
+</info>
