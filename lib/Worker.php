@@ -46,6 +46,9 @@ class Worker {
 	/** @var IRootFolder */
 	protected $rootFolder;
 
+	/** @var bool */
+	protected $nestedCall = false;
+
 	/**
 	 * @param ISystemTagObjectMapper $objectMapper
 	 * @param ISystemTagManager $tagManager
@@ -87,13 +90,19 @@ class Worker {
 			$tagIds[] = $systemTag->getId();
 		}
 
+		$this->nestedCall = true;
 		$this->objectMapper->assignTags($fileId, 'files', $tagIds);
+		$this->nestedCall = false;
 	}
 
 	/**
 	 * @param MapperEvent $event
 	 */
 	public function mapperEvent(MapperEvent $event) {
+		if ($this->nestedCall) {
+			return;
+		}
+
 		$tagIds = $event->getTags();
 		if ($event->getObjectType() !== 'files' || empty($tagIds)
 			|| !in_array($event->getEvent(), [MapperEvent::EVENT_ASSIGN, MapperEvent::EVENT_UNASSIGN])) {
@@ -132,8 +141,17 @@ class Worker {
 					return;
 				}
 
-				$tmpPath = $node->getStorage()->getLocalFile($node->getInternalPath());
-				$result = getimagesize($tmpPath, $info);
+				$source = $node->getStorage()->fopen($node->getInternalPath(), 'r');
+				if ($source === false) {
+					continue;
+				}
+
+				$tmpFile = \OC::$server->getTempManager()->getTemporaryFile();
+				file_put_contents($tmpFile, $source);
+				fclose($source);
+				$c = file_get_contents($tmpFile);
+
+				$result = getimagesize($tmpFile, $info);
 
 				if (!$result || !isset($info["APP13"])) {
 					return;
@@ -164,8 +182,10 @@ class Worker {
 				}
 
 				// Embed the IPTC data
-				$content = iptcembed($data, $tmpPath);
-				$node->getStorage()->file_put_contents($node->getPath(), $content);
+				$content = iptcembed($data, $tmpFile);
+				$source = $node->getStorage()->fopen($node->getInternalPath(), 'wb');
+				fwrite($source, $content);
+				fclose($source);
 			}
 		}
 	}
