@@ -11,7 +11,7 @@ If you have questions about how to install or use Nextcloud, please direct these
   - Go to one of the repositories, click "issues" and type any word in the top search/command bar.
   - You can also filter by appending e. g. "state:open" to the search string.
   - More info on [search syntax within github](https://help.github.com/articles/searching-issues)
-* This repository ([Files IPTC Tag Extractor](https://github.com/nextcloud/files_iptctagging/issues)) is *only* for issues within the Nextcloud Files IPTC Tag Extractor App code.
+* This repository ([Image tags](https://github.com/nextcloud/files_imagetags/issues)) is *only* for issues within the Nextcloud Image tags App code.
 * __SECURITY__: Report any potential security bug to us via security@nextcloud.com following our [security policy](https://nextcloud.com/security/) instead of filing an issue in our bug tracker.
 * Report the issue using our [template][template], it includes all the information we need to track down the issue.
 

@@ -30,7 +30,7 @@ use OCP\Util;
 class Application extends \OCP\AppFramework\App {
 
 	public function __construct() {
-		parent::__construct('files_iptctagging');
+		parent::__construct('files_imagetags');
 	}
 
 	/**
@@ -56,7 +56,7 @@ class Application extends \OCP\AppFramework\App {
 	 */
 	public function addStorageWrapper() {
 		// Needs to be added as the first layer
-		Filesystem::addStorageWrapper('files_iptctagging', [$this, 'addStorageWrapperCallback'], -1);
+		Filesystem::addStorageWrapper('files_imagetags', [$this, 'addStorageWrapperCallback'], -1);
 	}
 
 	/**

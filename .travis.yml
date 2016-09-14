@@ -8,7 +8,7 @@ php:
 env:
   global:
     - CORE_BRANCH=master
-    - APP_NAME=files_iptctagging
+    - APP_NAME=files_imagetags
   matrix:
     - DB=sqlite
 
