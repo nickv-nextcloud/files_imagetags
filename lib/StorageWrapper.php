@@ -19,7 +19,7 @@
  *
  */
 
-namespace OCA\FilesIPTCTagging;
+namespace OCA\FilesImageTags;
 
 use OC\Files\Storage\Wrapper\Wrapper;
 

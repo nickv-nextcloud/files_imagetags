@@ -19,11 +19,12 @@
  *
  */
 
-namespace OCA\FilesIPTCTagging\AppInfo;
+namespace OCA\FilesImageTags\AppInfo;
 
 use OC\Files\Filesystem;
-use OCA\FilesIPTCTagging\StorageWrapper;
+use OCA\FilesImageTags\StorageWrapper;
 use OCP\Files\Storage\IStorage;
+use OCP\SystemTag\MapperEvent;
 use OCP\Util;
 
 class Application extends \OCP\AppFramework\App {
@@ -37,6 +38,17 @@ class Application extends \OCP\AppFramework\App {
 	 */
 	public function registerHooksAndListeners() {
 		Util::connectHook('OC_Filesystem', 'preSetup', $this, 'addStorageWrapper');
+
+		$mapperListener = function(MapperEvent $event) {
+			/** @var \OCA\FilesImageTags\Worker $listener */
+			$listener = $this->getContainer()->query('OCA\FilesImageTags\Worker');
+			$listener->mapperEvent($event);
+		};
+
+
+		$dispatcher = $this->getContainer()->getServer()->getEventDispatcher();
+		$dispatcher->addListener(MapperEvent::EVENT_ASSIGN, $mapperListener);
+		$dispatcher->addListener(MapperEvent::EVENT_UNASSIGN, $mapperListener);
 	}
 
 	/**
@@ -55,7 +67,8 @@ class Application extends \OCP\AppFramework\App {
 	 */
 	public function addStorageWrapperCallback($mountPoint, IStorage $storage) {
 		if (!\OC::$CLI && !$storage->instanceOfStorage('OC\Files\Storage\Shared')) {
-			$worker = $this->getContainer()->query('OCA\FilesIPTCTagging\Worker');
+			/** @var \OCA\FilesImageTags\Worker $listener */
+			$worker = $this->getContainer()->query('OCA\FilesImageTags\Worker');
 
 			return new StorageWrapper([
 				'storage' => $storage,

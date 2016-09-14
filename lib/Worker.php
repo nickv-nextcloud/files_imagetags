@@ -19,14 +19,18 @@
  *
  */
 
-namespace OCA\FilesIPTCTagging;
+namespace OCA\FilesImageTags;
 
 
-use OC\Files\Storage\Local;
+use OCP\Files\Config\IMountProviderCollection;
+use OCP\Files\Folder;
+use OCP\Files\IRootFolder;
+use OCP\Files\Node;
 use OCP\Files\Storage\IStorage;
 use OCP\SystemTag\ISystemTagManager;
 use OCP\SystemTag\ISystemTagObjectMapper;
-use OCP\WorkflowEngine\IManager;
+use OCP\SystemTag\MapperEvent;
+use OCP\SystemTag\TagNotFoundException;
 
 class Worker {
 
@@ -36,18 +40,23 @@ class Worker {
 	/** @var ISystemTagManager */
 	protected $tagManager;
 
-	/** @var IManager */
-	protected $checkManager;
+	/** @var IMountProviderCollection */
+	protected $mountCollection;
+
+	/** @var IRootFolder */
+	protected $rootFolder;
 
 	/**
 	 * @param ISystemTagObjectMapper $objectMapper
 	 * @param ISystemTagManager $tagManager
-	 * @param IManager $checkManager
+	 * @param IMountProviderCollection $mountCollection
+	 * @param IRootFolder $rootFolder
 	 */
-	public function __construct(ISystemTagObjectMapper $objectMapper, ISystemTagManager $tagManager, IManager $checkManager) {
+	public function __construct(ISystemTagObjectMapper $objectMapper, ISystemTagManager $tagManager, IMountProviderCollection $mountCollection, IRootFolder $rootFolder) {
 		$this->objectMapper = $objectMapper;
 		$this->tagManager = $tagManager;
-		$this->checkManager = $checkManager;
+		$this->mountCollection = $mountCollection;
+		$this->rootFolder = $rootFolder;
 	}
 
 	/**
@@ -56,10 +65,8 @@ class Worker {
 	 * @param string $file
 	 */
 	public function readAndAssignTags(IStorage $storage, $fileId, $file) {
-		// TODO copy to tmp file if this fails
-		/** @var Local $storage */
-		$sourcePath = $storage->getSourcePath($file);
-		$result = getimagesize($sourcePath, $info);
+		$tmpPath = $storage->getLocalFile($file);
+		$result = getimagesize($tmpPath, $info);
 
 		if (!$result || !isset($info["APP13"])) {
 			return;
@@ -74,12 +81,139 @@ class Worker {
 		foreach ($tagInfo["2#025"] as $tag) {
 			try {
 				$systemTag = $this->tagManager->getTag($tag, true, true);
-			} catch (\OCP\SystemTag\TagNotFoundException $e) {
+			} catch (TagNotFoundException $e) {
 				$systemTag = $this->tagManager->createTag($tag, true, true);
 			}
 			$tagIds[] = $systemTag->getId();
 		}
 
 		$this->objectMapper->assignTags($fileId, 'files', $tagIds);
+	}
+
+	/**
+	 * @param MapperEvent $event
+	 */
+	public function mapperEvent(MapperEvent $event) {
+		$tagIds = $event->getTags();
+		if ($event->getObjectType() !== 'files' || empty($tagIds)
+			|| !in_array($event->getEvent(), [MapperEvent::EVENT_ASSIGN, MapperEvent::EVENT_UNASSIGN])) {
+			// System tags not for files, no tags, not (un-)assigning or no activity-app enabled (save the energy)
+			return;
+		}
+
+		try {
+			$tags = $this->tagManager->getTagsByIds($tagIds);
+		} catch (TagNotFoundException $e) {
+			// User assigned/unassigned a non-existing tag, ignore...
+			return;
+		}
+
+		if (empty($tags)) {
+			return;
+		}
+
+		// Get all mount point owners
+		$cache = $this->mountCollection->getMountCache();
+		$mounts = $cache->getMountsForFileId($event->getObjectId());
+		if (empty($mounts)) {
+			return;
+		}
+
+		foreach ($mounts as $mount) {
+			$owner = $mount->getUser()->getUID();
+			$ownerFolder = $this->rootFolder->getUserFolder($owner);
+			$nodes = $ownerFolder->getById($event->getObjectId());
+			if (!empty($nodes)) {
+				/** @var Node $node */
+				$node = array_shift($nodes);
+
+				if ($node instanceof Folder) {
+					// Can't write tags into folders
+					return;
+				}
+
+				$tmpPath = $node->getStorage()->getLocalFile($node->getInternalPath());
+				$result = getimagesize($tmpPath, $info);
+
+				if (!$result || !isset($info["APP13"])) {
+					return;
+				}
+
+				$app13 = iptcparse($info["APP13"]);
+				if (!isset($app13["2#025"])) {
+					$app13["2#025"] = [];
+				}
+
+				if ($event->getEvent() === MapperEvent::EVENT_ASSIGN) {
+					$app13["2#025"] = array_merge($app13["2#025"], $this->getTagNames($event->getTags()));
+				} else {
+					$app13["2#025"] = array_diff($app13["2#025"], $this->getTagNames($event->getTags()));
+				}
+
+				// Convert the IPTC tags into binary code again
+				$data = '';
+				foreach($app13 as $tag => $string) {
+					$tag = substr($tag, 2);
+					if (is_array($string)) {
+						foreach ($string as $str) {
+							$data .= $this->iptc_make_tag(2, $tag, $str);
+						}
+					} else {
+						$data .= $this->iptc_make_tag(2, $tag, $string);
+					}
+				}
+
+				// Embed the IPTC data
+				$content = iptcembed($data, $tmpPath);
+				$node->getStorage()->file_put_contents($node->getPath(), $content);
+			}
+		}
+	}
+
+	/**
+	 * @param int[] $tags
+	 * @return string[]
+	 */
+	protected function getTagNames(array $tags) {
+		$names = [];
+
+		foreach ($tags as $tagId) {
+			try {
+				$systemTags = $this->tagManager->getTagsByIds($tagId);
+			} catch (TagNotFoundException $e) {
+				continue;
+			}
+			$names[] = $systemTags[$tagId]->getName();
+		}
+
+		return $names;
+	}
+
+	/**
+	 * Copied from http://en.php.net/manual/en/function.iptcembed.php
+	 * iptc_make_tag() function by Thies C. Arntzen
+	 *
+	 * @param int $rec
+	 * @param string $data
+	 * @param string $value
+	 * @return string
+	 */
+	protected function iptc_make_tag($rec, $data, $value)
+	{
+		$length = strlen($value);
+		$retval = chr(0x1C) . chr($rec) . chr($data);
+
+		if($length < 0x8000) {
+			$retval .= chr($length >> 8) .  chr($length & 0xFF);
+		} else {
+			$retval .= chr(0x80) .
+				chr(0x04) .
+				chr(($length >> 24) & 0xFF) .
+				chr(($length >> 16) & 0xFF) .
+				chr(($length >> 8) & 0xFF) .
+				chr($length & 0xFF);
+		}
+
+		return $retval . $value;
 	}
 }

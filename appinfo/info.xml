@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
 <info>
-	<id>files_iptctagging</id>
-	<name>Files IPTC tag extractor</name>
-	<description>An app for Nextcloud that automatically reads IPTC tags from files and applies them as collaborative tags.</description>
+	<id>files_imagetags</id>
+	<name>Image tags</name>
+	<description>An app for Nextcloud that automatically syncs IPTC tags from images to collaborative tags and back.</description>
 	<licence>AGPL</licence>
 	<author>Joas Schilling</author>
-	<version>1.0.0</version>
-	<namespace>FilesIPTCTagging</namespace>
+	<version>0.5.0</version>
+	<namespace>FilesImageTags</namespace>
 
 	<category>other</category>
-	<website>https://github.com/nickv-nextcloud/files_iptctagging</website>
-	<bugs>https://github.com/nickv-nextcloud/files_iptctagging/issues</bugs>
-	<repository type="git">https://github.com/nickv-nextcloud/files_iptctagging.git</repository>
+	<website>https://github.com/nickv-nextcloud/files_imagetags</website>
+	<bugs>https://github.com/nickv-nextcloud/files_imagetags/issues</bugs>
+	<repository type="git">https://github.com/nickv-nextcloud/files_imagetags.git</repository>
 
 	<types>
 		<filesystem/>

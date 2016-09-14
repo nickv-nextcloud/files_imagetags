@@ -19,5 +19,17 @@
  *
  */
 
-$application = new \OCA\FilesImageTags\AppInfo\Application();
-$application->registerHooksAndListeners();
+if (!defined('PHPUNIT_RUN')) {
+	define('PHPUNIT_RUN', 1);
+}
+
+require_once __DIR__.'/../../../lib/base.php';
+
+if(!class_exists('PHPUnit_Framework_TestCase')) {
+	require_once('PHPUnit/Autoload.php');
+}
+
+// Fix for "Autoload path not allowed: .../files_imagetags/tests/..."
+\OC_App::loadApp('files_imagetags');
+
+OC_Hook::clear();
